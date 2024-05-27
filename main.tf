@@ -14,7 +14,7 @@ data "aws_availability_zones" "available" {
 
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
-  version = "2.77.0"
+  version = "5.8.1"
 
   name = "main-vpc"
   cidr = "10.0.0.0/16"
@@ -31,7 +31,9 @@ data "aws_ami" "amazon-linux" {
 
   filter {
     name   = "name"
-    values = ["amzn-ami-hvm-*-x86_64-ebs"]
+    // NOT exist anymore
+    /*values = ["amzn-ami-hvm-*-x86_64-ebs"]*/
+    values = ["amzn2-ami-*-hvm-*x86_64-*"]
   }
 }
 
@@ -163,3 +165,28 @@ resource "aws_acm_certificate" "cert" {
   private_key      = tls_private_key.example.private_key_pem
   certificate_body = tls_self_signed_cert.terramino.cert_pem
 }
+
+check "certificate" {
+  assert {
+    #condition     = aws_acm_certificate.cert.status == "ERRORED"
+    condition     = aws_acm_certificate.cert.status == "ISSUED"
+    error_message = "Certificate status is ${aws_acm_certificate.cert.status}"
+  }
+}
+
+// Check with a dataSource
+check "response" {
+  // query the dataSource, to be used afterwards in the assertion
+  data "http" "terramino" {
+    url      = "https://${aws_lb.terramino.dns_name}"
+    insecure = true
+  }
+
+  assert {
+    condition     = data.http.terramino.status_code == 200
+    error_message = "Terramino response is ${data.http.terramino.status_code}"
+  }
+}
+
+
+
